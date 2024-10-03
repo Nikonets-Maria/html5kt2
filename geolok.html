@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <!-- <link href="components\geolok.css" rel="stylesheet" type="text/css"> -->
+</head>
+<body>
+    <h1>Привет, житель этой планеты!</h1> 
+    <!-- <img class="imeg" src="components\imges\planet.png" alt="Планета Земля"> <br> -->
+    <button id="getLocation"> Узнать где вы сейчас (Geolocation API) </button> <br>
+    <div id="locationDisplay"></div>
+    <form id="commentForm"><br>
+      <textarea id="commentText" placeholder="Введите комментарий для этой локации:" ></textarea> <br>
+      <button type="submit"> Сохранить </button> <br>  <!-- в LocalStorage -->
+  </form>
+  <h2>Вы уже были в этих местах (LocalStorage)</h2>
+  <ul id="localStorageList"></ul>
+  
+  <h2>Ваши сохранённые заметки (IndexedDB)</h2>
+  <ul id="indexedDBList"></ul>
+
+
+  <script>
+   let latitude, longitude;
+
+   document.getElementById('getLocation').addEventListener('click', function() {
+       if (navigator.geolocation) {
+           navigator.geolocation.getCurrentPosition(position => {
+               latitude = position.coords.latitude;
+               longitude = position.coords.longitude;
+               document.getElementById('locationDisplay').innerText = `Широта: ${latitude}, Долгота: ${longitude}`;
+           });
+       } else {
+           alert('Geolocation не поддерживается в этом браузере.');
+       }
+   });
+
+   document.getElementById('commentForm').addEventListener('submit', function(event) {
+       event.preventDefault();
+       const comment = document.getElementById('commentText').value;
+       saveToLocalStorage(comment);
+       saveToIndexedDB(comment);
+       document.getElementById('commentText').value = ''; 
+   });
+
+   function saveToLocalStorage(comment) {
+       const data = { latitude, longitude, comment };
+       let comments = JSON.parse(localStorage.getItem('comments')) || [];
+       comments.push(data);
+       localStorage.setItem('comments', JSON.stringify(comments));
+       displayLocalStorageComments();
+   }
+
+   function displayLocalStorageComments() {
+       const list = document.getElementById('localStorageList');
+       list.innerHTML = '';
+       const comments = JSON.parse(localStorage.getItem('comments')) || [];
+       comments.forEach(item => {
+           const li = document.createElement('li');
+           li.innerText = `Комментарий: ${item.comment}, Широта: ${item.latitude}, Долгота: ${item.longitude}`;
+           list.appendChild(li);
+       });
+   }
+
+   //IndexedDB
+   let db;
+   const request = indexedDB.open('GeoCommentsDB', 1);
+
+   request.onupgradeneeded = () => {
+       db = request.result;
+       db.createObjectStore('comments', { autoIncrement: true });
+   };
+
+   request.onsuccess = () => {
+       db = request.result;
+       displayIndexedDBComments();
+   };
+
+   function saveToIndexedDB(comment) {
+       const transaction = db.transaction('comments', 'readwrite');
+       const store = transaction.objectStore('comments');
+       const data = { latitude, longitude, comment };
+       store.add(data);
+       transaction.oncomplete = displayIndexedDBComments;
+   }
+
+   function displayIndexedDBComments() {
+       const list = document.getElementById('indexedDBList');
+       list.innerHTML = '';
+       const transaction = db.transaction('comments', 'readonly');
+       const store = transaction.objectStore('comments');
+       const request = store.getAll();
+
+       request.onsuccess = () => {
+           const comments = request.result;
+           comments.forEach(item => {
+               const li = document.createElement('li');
+               li.innerText = `Комментарий: ${item.comment}, Широта: ${item.latitude}, Долгота: ${item.longitude}`;
+               list.appendChild(li);
+           });
+       };
+   }
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
